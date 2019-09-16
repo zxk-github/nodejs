@@ -1,0 +1,8 @@
+web性能优化gzip应该不是很陌生，浏览器像服务器发起资源请求，比如下载一个js文件，服务器对资源进行压缩之后再返回给浏览器，节省流量，加快访问速度
+浏览器http请求头加上accept-encoding，高度服务器可以使用gzip，或者defalte算法压缩资源
+Accept-Encoding: gzip, deflate
+
+nodejs中使用zlib模块进行资源的压缩
+
+
+

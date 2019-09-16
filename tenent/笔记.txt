@@ -1,0 +1,233 @@
+nodejs远程调试
+
+1. 运行程序使用
+node --inspect index.js
+2. 在Chrome上打开chrome://inspect
+
+nodejs模块化机制
+
+模块化原因
+第一 有利于多人协作开发，提升开发效率
+第二 清晰明确的架构也有利于提升程序的可维护性
+
+commonjs
+为什么需要模块化
+1. 方便多人合作分工
+2. 通过定义依赖可避免加载无用脚本
+3. 减少代码耦合度
+4. 解决命名冲突问题
+5. 模块复用，减少重复造轮子
+
+commonjs
+1. 通过require()方法，传入模块的标识，引入模块
+2. 模块标识可以是驼峰命名或者是../ ./的路径，或者是绝对路径
+3. 每个模块存在一个module对象，代表模块的本身
+4. 每个模块都有独立的作用域
+5. 通过上下文提供exports对象用于导出当前模块的方法和变量，同时exports是module的一个属性
+
+
+每个模块内的module对象代表当前模块
+console.log(module)
+
+每个模块都有单独的作用域
+console.log(a) // a is undefined
+
+通过module.exports向外暴露对象或接口
+module.exports = {}
+module.exports.a = {}
+
+nodejs模块
+核心模块 直接使用require("fs") 引入
+自定义模块 通过相对路径或者绝对路径引入 js  json node
+
+module.paths 就是nodejs 尝试查找文件的时候的查找路径
+[ '/Users/zhangxk/demo/nodejs/tenent/node_modules',
+'/Users/zhangxk/demo/nodejs/node_modules',
+'/Users/zhangxk/demo/node_modules',
+'/Users/zhangxk/node_modules',
+'/Users/node_modules',
+'/node_modules' ] 
+文件路径每级向上查找对应文件夹的node_modules文件夹，直到跟目录
+
+/node_modules/moment.js
+/node_modules/moment.json
+/node_modules/moment.node
+/node_modules/moment/package.json中的main配置项
+/node_modules/momemt/index.js
+
+取当前目录下的node_modules为查找路径
+首先尝试把模块标识符当作是文件名处理
+把路径当做目录(包)来处理
+去上一级node_modules重复上面2，3步骤，直到找到跟目录
+
+模块缓存机制
+nodejs在成功引入一个模块之后就会把这个模块的绝对路径作为key，这个模块的执行结果作为value,缓存在require.cache上面，造次使用到模块的时候，就可以通过模块的绝对路径找到模块的缓存，这样就不会再次读取和执行文件了，这时候文件已经被缓存了，我们再次编写这个模块文件也不会起作用了，如果我们需要修改模块，但是又不重启服务，这时候可以把require.cache中的缓存删除掉，这个方法对于我们开发，还有线上实现热更新都是很有用的
+
+const http = require('http');
+
+http.createServer((req, res) => {
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/plain");
+    Object.keys(require.cache).forEach(el => {
+        delete require.cache[el];
+    })
+
+    const moduleA = require('./moduleA');
+    res.end(`moduleA text ${moduleA.txt}`);
+}).listen('3001');
+
+npm 包
+一个对应一个目录，在目录中存在package.json文件
+一个包必须要有一个入口文件，一个包可以有多个模块组成
+
+需要到npm官网注册一个npm账号才能进行npm包的发布
+npm adduser
+npm publish
+
+在执行node服务的时候，因为所有的脚本都在服务器本地存在所以commonjs是一个同步过程
+
+在浏览器端，因为文件都存在服务器上，所以不能使用同步操作，所以就出现了AND和CMD规范
+
+AMD 规范
+define(['dep1'], function(dep1) {
+    function fn() {};
+
+    return {
+        fn: fn 
+    }
+})
+当模块加载器把所有依赖的模块加载完成之后，就会执行回掉函数, 回掉函数返回值作为模块输出的内容
+
+CMD 
+define(function(require, exports, module) {
+    var dep1 = require('dep1');
+
+    function fn1() {}
+
+    exports.fn = fn;
+
+})
+先把回掉函数转换成字符串，然后分析里面require了哪些模块， 然后把模块作为依赖提取出来，加载完所有依赖，再去执行回掉函数
+
+UMD规范是一种通用规范，可以同时运行在服务端和浏览器端，说白了就是把常用的集中规范柔和在一起
+!function(root, factory) {
+    // commonjs
+    if(typeof module !== 'undefined' && typeof exports === 'object') {
+         module.exports = factory();
+    // CMD AMD
+    } else if (typeof define === 'function' && define.amd || define.cmd){
+        define(function() {return factory();})
+    // 浏览器
+    } else {
+        root.moduleName = factory();
+    }
+}(this, function() {
+    // return {}
+})
+
+
+异步编程
+
+异步 
+当有响应的结果时，采用事件驱动的方式，例如刚才的短信来的时候，短信的提醒，在等待的过程中可以进行其他的工作
+
+I/O  计算机的输入与输出
+文件读写，网路请求这些都需要调用计算机I/O设备的操作
+同步I/O 
+I/O请求发起之后 计算机会等待I/O的返回，在这期间，计算机不会做任何的事情
+
+nodejs中如何实现异步I/O
+
+事件循环: 处理事件的逻辑
+事件：指在程序执行过程中发生的事情，比如说：敲击键盘，任务的状态发生了改变(比如文件读取完成)，新的网络请求
+nodejs中维护了一个事件队列，新产生的事件被按照顺序添加到队列之中，并且会按照先进先出的方式处理事件，在这个过程中如果有新的事件产生，同样会被插入到队列的尾部，接着会继续处理事件，一直到不会有新的事件产生
+
+事件循环流程图
+当nodejs进程开启之后，将进入一个类似while true的循环，在这个循环的顶部，首先会判断这个循环是不是活动的(比如说还有任务没有完成， 文件读取了还没有收到结果，或者说开启了一个web服务还没有关闭，那么这个循环就是活动的，如果说循环不会有新的事件产生，那么循环就不是活动的，这时候我们的进程将会结束)，循环是获取的我们会判断当前的循环里面是否有队列，队列里面已经有事件了，那么我们就会执行所有事件的回掉，执行完成之后，将会进入写一个循环，而如果刚才执行的队列里面没有事件，但是循环又是活动的，这时候我们进程会等待新的事件产生，当新的事件来的时候，会直接执行事件的回掉，完成之后会进入新的下一轮事件的循环
+
+使用nodejs搭建的服务器，我们称之为基于事件驱动模型的web服务器
+
+传统网络模型使用单请求单线程的模式，因为传统网络模型使用同步I/O的模式
+第一个请求包含两个I/O，即使这两个I/O没有什么关系，但是因为是同步I/O，所以只能串行执行，也就是说，第一个I/O没有执行完成之前，第二个I/O是不能开始的，并且线程是一直被占用的，当前这个请求不处理完成，就不能处理下一个请求，所以这个线程并不能足以应对我们大量的请求
+所以传统的网络服务器，回为每一个请求，分配一个单独的线程，这个线程只处理这一个请求，直到这个请求结束，然后这个线程会被销毁或者被回收
+所以传统服务器并发的数量取决于我们能开启多少个线程
+当所有线程都在等I/O返回的结果的时候，这时候，CpU实际上是空闲的,在不考虑I/O设备最大负载的前提下，理论上来说我们可以一直增加线程，直到CPU无时无刻不处于工作状态，但是新开线程是要增加内存开销的，操作系统协作多个线程也是会增加新的内存开销的
+
+事件驱动模型的服务器
+只包含了一个主线程，所有的js逻辑都放在了主线程中执行，当一个请求的事件逻辑执行完毕之后，在等待I/O事件返回期间，node会处理下一个请求返回的事件，和传统相比尽管cpU的计算不变，但是节省了开启多线程的开销，这样内存将不会是并发数量的瓶颈，而是取决于cPU和I/O设备的处理速度，当多个I/O之间没有依赖关系的时候，我们完全可以并行的处理
+
+nodejs服务器特点
+1. 高并发连接 使用单线程加事件驱动模型
+2. 适合I/O密集型任务 使用异步I/O加事件驱动的模型
+3. 不适合CPU密集型计算服务
+ 
+在我们习惯的同步编程中，一般使用try catch 来捕获执行过程中的错误
+在异步编程中如何错误产生的时间发生在错误的完成阶段，此时抛出的异常是无法通过简单的try catch捕获到的，因为异步I/O是不会等待I/O执行结果的，此时错误还没有产生，等到错误产生的时候，其实已经脱离了try catch的上下文了
+function dis(point1, point2, callback){
+    setTimeout(() => {  
+        if(check(point1) || check(point2)) {
+            callback(new Error('参数错误'))
+            return;
+        }
+        let result = point1 + point2;
+        callback(null, result)
+
+    })
+}
+
+在异步编程中存在这大量的异步回掉逻辑，如果不好好组织代码，最终会导致代码混乱，难以维护，为此在node中将回调方法进行了事件化处理。我们称之为发布订阅者模式，将公共模块包装成发布者，可以发布不同的事件，调用者作为订阅者，可以有选择性的订阅关注的事件
+
+例子：
+开启一个web服务，这时候接受到一个请求，或者说错误处理，这些都需要注册对应的回掉函数进行处理，使用发布订阅模式，他们可以以事件的形式在server对象上触发，而我们为不同的事件注册了对应的回调方法，只需要监听就行了，当不需要某些事件的时候还可以通过off方法，注销对某些事件的监听
+let server = http.createServer();
+server.on('request', (req, res) => {
+    res.write('hello word');
+    res.end()
+})
+
+server.on('error', () => {
+    console.log('server error')
+})
+这时候其实就是一个1对多的关系，我们有一个当前的模块，注册了多个不同的事件
+
+当同一个事件，在项目中有多个不同的模块都需要关注，这时候就是多对一的关系，我们有多个订阅者，而一个发布者这时候我们只需要在各自的模块注册事件回调就可以了
+
+模块1
+let server = http.createServer();
+server.on('request', (req, res) => {
+    res.write('hello word');
+    res.end()
+})
+
+模块2
+server.on('request', (req, res) => {
+    console.log(111);
+})
+
+server stream http nodejs中很多模块都继承至events这样一个类
+如果我们要自己实现一个发布者其实很简单
+var EventEmitter = require('events');
+class MyEmitter extends EventEmitter {}
+const myEmitter = new MyEmitter();
+myEmitter.on('event', () => {
+    console.log("触发了一个事件")
+})
+myEmitter.emit('event')
+
+
+promise/A+
+
+const util = require('util');
+const readFile = util.promisify(fs.readFile);
+readFile(filePath1).then(data => {
+    console.log(data)
+    return readFile(filePath2)
+}).then((data) => {
+    console.log(data)
+}).catch((err) => {
+    console.log(err);
+})
+
+
+
+

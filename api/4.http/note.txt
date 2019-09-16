@@ -1,0 +1,123 @@
+http模块可以用来创建web服务器，http客户端
+
+服务器server: 接受来自客户端的请求，并将客户端请求的地址返回给客户端
+客户端client: 向服务器发起请求，并将服务器返回的内容打印到控制台
+
+server： http.server实例，用来提供服务创建客户端的请求
+client: http:clientRequest实例，用来向服务端发起请求
+req，res都是http.incomingMessage实例
+req 用来获取客户端的请求
+res 用来获取服务端返回的请求
+serverRes: http.ServerResponse实例
+
+关于http.incomingMessage http.ServerResponse
+http.serverResponse 
+服务端通过http.serverResponse实例，来获取请求发送数据，包括发送响应表头，发送响应主体等
+
+http.incomingMessage
+在server端 获取请求发送方的信息，例如请求方法、路径、传递的数据等
+在client端 获取server端发送过来的信息
+三个重要数据 method  statusCode statusMessage
+method 只在server端的实例有(也就是 serverReq.method)
+statusCode/statusMessage 只在client端的实例有
+
+
+req
+req实际上是http.incomingMessage实例，在服务端和客户端作用略有差异
+服务端：获取请求方的相关信息，如 request header
+客户端：获取响应方相关的信息 如statusCode
+
+
+
+类型	名称	            服务端	客户端
+事件	aborted	            ✓	    ✓
+事件	close	            ✓	    ✓
+属性	headers	            ✓	    ✓
+属性	rawHeaders	        ✓	    ✓
+属性	statusCode	        ✕	    ✓
+属性	statusMessage	    ✕	    ✓
+属性	httpVersion         ✓	    ✓
+属性	url	                ✓	    ✕
+属性	socket	            ✓	    ✓
+方法	.destroy()	        ✓	    ✓
+方法	.setTimeout()	    ✓	    ✓
+
+
+获取url var url = req.url
+处理url var urlObj = util.parse(url);
+获取query var query = urlObj.query;
+处理query var queryObj = querystring.parse(query)
+
+
+res 返回的内容 状态码/描述信息 响应头部 响应主体 
+
+
+res.writeHead(200, {
+    "Content-Type": "text/plain"
+})
+res.end('ee')
+
+res.writeHead(200, 'ok')
+res.statusCode = 200;
+res.statusMessage = "ok"
+
+两者差别
+res.writeHead() 提供可以设置相应头的功能
+当响应头部发送出去之后。res.statusCode/res.statusMessage 会被设置成已发送出去的 状态码/状态描述信息
+
+设置响应头部
+
+res提供了res.writeHead()  res.setHeader()来实现响应头部的设置
+
+res.setHeader()设置了header，当通过res.writeHead()设置同名header 前面的会覆盖，但是如果setHeader在后面。会报错
+
+增 删 改 查
+res.setHeader("Content-Type", "text/plain")
+
+res.removeHeader("Content-Type")
+
+res.setHeader("Content-Type", 'text/html')
+res.setHeader("Content-Type", "text/plain")
+
+res.getHeader("content-type")  // 需要小写
+
+
+设置响应主体
+主要用到 res.write() 以及 res.end() 两个方法。
+
+res.write() API的信息量略大，建议看下官方文档。
+
+response.write(chunk[, encoding][, callback])
+chunk：响应主体的内容，可以是string，也可以是buffer。当为string时，encoding参数用来指明编码方式。（默认是utf8）
+encoding：编码方式，默认是 utf8。
+callback：当响应体flushed时触发。（TODO 这里想下更好的解释。。。）
+使用上没什么难度，只是有些注意事项：
+
+如果 res.write() 被调用时， res.writeHead() 还没被调用过，那么，就会把header flush出去。
+res.write() 可以被调用多次。
+当 res.write(chunk) 第一次被调用时，node 会将 header 信息 以及 chunk 发送到客户端。第二次调用 res.write(chunk) ，node 会认为你是要streaming data（WTF，该怎么翻译）。。。
+Returns true if the entire data was flushed successfully to the kernel buffer. Returns false if all or part of the data was queued in user memory. 'drain' will be emitted when the buffer is free again.
+
+response.end([data][, encoding][, callback])
+掌握了 res.write() 的话，res.end() 就很简单了。res.end() 的用处是告诉nodejs，header、body都给你了，这次响应就到这里吧。
+
+有点像个语法糖，可以看成下面两个调用的组合。至于callback，当响应传递结束后触发。
+
+res.write(data, encoding);
+res.end()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
